@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: amfithieta
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./Events-ticketing-system-b  # Path to your backend repo folder
+    command: >
+      sh -c "python manage.py migrate &&
+             gunicorn --bind 0.0.0.0:8000 --workers 3 ticketing_system.wsgi:application"
+    volumes:
+      - ./Events-ticketing-system-b:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./Events-ticketing-system-b/.env
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/amfithieta
+      - REDIS_URL=redis://redis:6379/1
+      - DEBUG=True
+      - ALLOWED_HOSTS=localhost,127.0.0.1,backend
+    depends_on:
+      - db
+      - redis
+
+  frontend:
+    build: ./Events-ticketing-system-f  # Path to your frontend repo folder
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./Events-ticketing-system-f/.env.local
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
